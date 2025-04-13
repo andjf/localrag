@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx-proxy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
+    ports:
+      - "80:80"
+    networks:
+      - app-network
+    depends_on:
+      - localrag
+
+  localrag:
+    build:
+      context: ./localrag
+      dockerfile: Dockerfile
+    container_name: localrag
+    ports:
+      - "8080:80"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

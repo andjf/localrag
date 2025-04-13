@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: localrag
+  config:
+    import: optional:secrets.yml
+
+server:
+  port: 80
+
+openai:
+  model: gpt-4o-mini
+
+nlp:
+  sentence-model: nlp/en-sent.bin
+  tokenization-model: nlp/en-tokens.bin
+  ner-date-model: nlp/en-ner-date.bin
+  ner-location-model: nlp/en-ner-location.bin
+  ner-money-model: nlp/en-ner-money.bin
+  ner-organization-model: nlp/en-ner-organization.bin
+  ner-percentage-model: nlp/en-ner-percentage.bin
+  ner-person-model: nlp/en-ner-person.bin
+  ner-time-model: nlp/en-ner-time.bin

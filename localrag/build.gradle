@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'dev.andrew'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+    all {
+        exclude group: 'org.slf4j', module: 'slf4j-simple'
+    }
+}
+
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    implementation 'io.github.sashirestela:simple-openai:3.17.2'
+
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    implementation 'org.apache.opennlp:opennlp-tools:2.5.3'
+
+    // Lucene Core (includes kNN vector search functionality)
+    // implementation 'org.apache.lucene:lucene-core:9.9.1'
+
+    // Lucene analysis and query parsing
+    // implementation 'org.apache.lucene:lucene-analysis-common:9.9.1'
+    // implementation 'org.apache.lucene:lucene-queryparser:9.9.1'
+
+    implementation 'org.slf4j:slf4j-api:2.0.0'
+    implementation 'ch.qos.logback:logback-core:1.5.6'
+    implementation 'ch.qos.logback:logback-classic:1.5.6'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    compileOnly 'org.projectlombok:lombok'
+
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
