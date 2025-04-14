@@ -1,90 +1,69 @@
 package dev.andrew.localrag.controller;
 
-import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Stream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.MediaType;
+import org.springframework.util.Assert;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.google.common.collect.Streams;
 
 import dev.andrew.localrag.properties.OpenAiProperties;
-import io.github.sashirestela.openai.SimpleOpenAI;
-import io.github.sashirestela.openai.domain.chat.Chat;
-import io.github.sashirestela.openai.domain.chat.Chat.Choice;
-import io.github.sashirestela.openai.domain.chat.ChatMessage.ResponseMessage;
+import dev.andrew.localrag.service.NlpService;
+import io.github.sashirestela.openai.domain.chat.ChatMessage.SystemMessage;
+import io.github.sashirestela.openai.domain.chat.ChatMessage.UserMessage;
 import io.github.sashirestela.openai.domain.chat.ChatRequest;
-import io.github.sashirestela.openai.domain.chat.ChatRequest.ChatRequestBuilder;
+import io.github.sashirestela.openai.domain.embedding.EmbeddingRequest;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public abstract class AiController {
+@RestController
+@RequestMapping("/v1")
+public class AiController extends BaseAiController {
 
-    private static final double DEFAULT_TEMP = 0.5;
-    private static final int DEFAULT_MAX_TOKENS = 300;
+    NlpService nlpService;
 
-    protected final OpenAiProperties openAiConfiguration;
-    protected final SimpleOpenAI openAI;
+    public AiController(OpenAiProperties openAiProperties, NlpService nlpService) {
+        super(openAiProperties);
+        this.nlpService = nlpService;
+    }
 
-    public AiController(OpenAiProperties openAiConfiguration) {
-        this.openAiConfiguration = openAiConfiguration;
-        this.openAI = SimpleOpenAI.builder()
-                .apiKey(this.openAiConfiguration.apiKey())
+    @PostMapping(value = "/chat", produces = MediaType.TEXT_PLAIN_VALUE, consumes = MediaType.TEXT_PLAIN_VALUE)
+    public String chat(@RequestBody String prompt) throws IOException {
+        log.info("Initiated /v1/chat request with prmopt [{}]", prompt);
+
+        ChatRequest chat = chatRequestBuilder()
+                .message(SystemMessage.of("You are an expert in AI designd to answer any question."))
+                .message(UserMessage.of(prompt))
                 .build();
+
+        return super.chat(chat);
     }
 
-    protected String model() {
-        return this.openAiConfiguration.model();
+    private record Embedding(String sentence, List<Double> embedding) {
     }
 
-    protected ChatRequestBuilder baseBuilder() {
-        return this.baseBuilder(DEFAULT_TEMP, DEFAULT_MAX_TOKENS);
-    }
+    @PostMapping(value = "/embeddings", produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.TEXT_PLAIN_VALUE)
+    public List<Embedding> embedding(@RequestBody String text) throws IOException {
+        log.info("Initiated /v1/embeddings request with text [{}]", text);
 
-    protected ChatRequestBuilder baseBuilder(int maxTokens) {
-        return this.baseBuilder(DEFAULT_TEMP, maxTokens);
-    }
+        List<String> sentences = Arrays.asList(this.nlpService.sentences(text));
 
-    protected ChatRequestBuilder baseBuilder(double temp) {
-        return this.baseBuilder(temp, DEFAULT_MAX_TOKENS);
-    }
+        EmbeddingRequest req = embeddingRequestBuilder()
+                .input(sentences)
+                .build();
 
-    protected ChatRequestBuilder baseBuilder(double temp, int maxTokens) {
-        return ChatRequest.builder()
-                .model(this.model())
-                .temperature(temp)
-                .maxCompletionTokens(maxTokens);
-    }
+        List<List<Double>> embeddings = super.embeddings(req);
 
-    protected String chat(ChatRequest chat) {
-        return openAI.chatCompletions()
-                .create(chat)
-                .join()
-                .firstContent();
-    }
+        Assert.isTrue(sentences.size() == embeddings.size(), "Embeddings were not generated for every sentence");
 
-    private boolean shouldChoose(Choice choice) {
-        return Optional.ofNullable(choice)
-                .map(Choice::getMessage)
-                .map(ResponseMessage::getContent)
-                .filter(StringUtils::isNotEmpty)
-                .isPresent();
-    }
-
-    private String extractToken(Chat chat) {
-        return Optional.ofNullable(chat)
-                .map(Chat::getChoices)
-                .map(choices -> choices.stream()
-                        .filter(this::shouldChoose)
-                        .findFirst()
-                        .orElse(null))
-                .map(Choice::getMessage)
-                .map(ResponseMessage::getContent)
-                .orElse(null);
-    }
-
-    protected Stream<String> chatStream(ChatRequest chat) {
-        var futureChat = openAI.chatCompletions().createStream(chat);
-        var chatResponse = futureChat.join();
-        return chatResponse.map(this::extractToken).filter(Objects::nonNull);
+        return Streams.zip(sentences.stream(), embeddings.stream(), (s, e) -> new Embedding(s, e))
+                .toList();
     }
 
 }

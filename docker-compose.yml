@@ -19,8 +19,6 @@ services:
       context: ./localrag
       dockerfile: Dockerfile
     container_name: localrag
-    ports:
-      - "8080:80"
     networks:
       - app-network
 
