@@ -37,12 +37,7 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.14.0'
     implementation 'org.apache.opennlp:opennlp-tools:2.5.3'
 
-    // Lucene Core (includes kNN vector search functionality)
-    // implementation 'org.apache.lucene:lucene-core:9.9.1'
-
-    // Lucene analysis and query parsing
-    // implementation 'org.apache.lucene:lucene-analysis-common:9.9.1'
-    // implementation 'org.apache.lucene:lucene-queryparser:9.9.1'
+    implementation 'org.apache.lucene:lucene-core:9.9.1'
 
     implementation 'org.slf4j:slf4j-api:2.0.0'
     implementation 'ch.qos.logback:logback-core:1.5.6'

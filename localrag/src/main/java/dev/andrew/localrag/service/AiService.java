@@ -1,4 +1,4 @@
-package dev.andrew.localrag.controller;
+package dev.andrew.localrag.service;
 
 import java.util.List;
 import java.util.Objects;
@@ -6,7 +6,12 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
 
+import com.google.common.collect.Streams;
+
+import dev.andrew.localrag.model.SentenceEmbedding;
 import dev.andrew.localrag.properties.OpenAiProperties;
 import io.github.sashirestela.openai.SimpleOpenAI;
 import io.github.sashirestela.openai.domain.chat.Chat;
@@ -21,43 +26,44 @@ import io.github.sashirestela.openai.domain.embedding.EmbeddingRequest.EncodingF
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public abstract class BaseAiController {
+@Service
+public class AiService {
 
     private static final double DEFAULT_TEMP = 0.5;
     private static final int DEFAULT_MAX_TOKENS = 300;
 
-    protected final OpenAiProperties openAiProperties;
-    protected final SimpleOpenAI openAI;
+    private final OpenAiProperties openAiProperties;
+    private final SimpleOpenAI openAI;
 
-    public BaseAiController(OpenAiProperties openAiProperties) {
+    public AiService(OpenAiProperties openAiProperties) {
         this.openAiProperties = openAiProperties;
         this.openAI = SimpleOpenAI.builder()
                 .apiKey(this.openAiProperties.apiKey())
                 .build();
     }
 
-    protected String chatModel() {
+    public String chatModel() {
         return this.openAiProperties.chatModel();
     }
 
-    protected String embeddingModel() {
+    public String embeddingModel() {
         return this.openAiProperties.embeddingsModel();
     }
 
-    protected ChatRequestBuilder chatRequestBuilder() {
+    public ChatRequestBuilder chatRequestBuilder() {
         return ChatRequest.builder()
                 .model(this.chatModel())
                 .temperature(DEFAULT_TEMP)
                 .maxCompletionTokens(DEFAULT_MAX_TOKENS);
     }
 
-    protected EmbeddingRequestBuilder embeddingRequestBuilder() {
+    public EmbeddingRequestBuilder embeddingRequestBuilder() {
         return EmbeddingRequest.builder()
                 .model(this.embeddingModel())
                 .encodingFormat(EncodingFormat.FLOAT);
     }
 
-    protected String chat(ChatRequest chat) {
+    public String chat(ChatRequest chat) {
         return openAI.chatCompletions()
                 .create(chat)
                 .join()
@@ -84,13 +90,13 @@ public abstract class BaseAiController {
                 .orElse(null);
     }
 
-    protected Stream<String> chatStream(ChatRequest chat) {
+    public Stream<String> chatStream(ChatRequest chat) {
         var futureChat = openAI.chatCompletions().createStream(chat);
         var chatResponse = futureChat.join();
         return chatResponse.map(this::extractToken).filter(Objects::nonNull);
     }
 
-    protected List<List<Double>> embeddings(EmbeddingRequest embeddingRequest) {
+    public List<List<Double>> embeddings(EmbeddingRequest embeddingRequest) {
         List<EmbeddingFloat> embeddingData = this.openAI.embeddings()
                 .create(embeddingRequest)
                 .join()
@@ -99,6 +105,25 @@ public abstract class BaseAiController {
         return embeddingData.stream()
                 .map(EmbeddingFloat::getEmbedding)
                 .toList();
+    }
+
+    public List<SentenceEmbedding> sentenceEmbeddings(List<String> sentences) {
+        EmbeddingRequest req = this.embeddingRequestBuilder()
+                .input(sentences)
+                .dimensions(1024)
+                .build();
+
+        List<List<Double>> embeddings = this.embeddings(req);
+
+        Assert.isTrue(sentences.size() == embeddings.size(), "Embeddings were not generated for every sentence");
+
+        return Streams.zip(sentences.stream(), embeddings.stream(), (s, e) -> new SentenceEmbedding(s, e)).toList();
+    }
+
+    public SentenceEmbedding embedding(String text) {
+        List<SentenceEmbedding> embeddings = this.sentenceEmbeddings(List.of(text));
+        Assert.isTrue(embeddings.size() == 1, "Expected 1 embedding. Got " + embeddings.size());
+        return embeddings.get(0);
     }
 
 }
